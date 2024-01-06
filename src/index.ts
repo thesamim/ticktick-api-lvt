@@ -47,6 +47,7 @@ export class Tick {
 
   async login(): Promise<boolean> {
     try {
+      console.log(this.apiUrl, this.username, this.password)
       const url = `${this.apiUrl}/${singnInEndPoint}`;
       const options = {
         method: 'POST',
@@ -54,8 +55,11 @@ export class Tick {
         headers: {
           'Content-Type': 'application/json',
           Origin: 'https://ticktick.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
-          'x-device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64f9effe6edff918986b5f71","channel":"website","campaign":"","websocket":""}'
+          // 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
+          // 'x-device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64f9effe6edff918986b5f71","channel":"website","campaign":"","websocket":"123"}'
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
+            "X-Device"  : "{\"platform\":\"web\",\"os\":\"Windows 10\",\"device\":\"Firefox 121.0\",\"name\":\"\",\"version\":5050,\"id\":\"65957b7390584350542c3c92\",\"channel\":\"website\",\"campaign\":\"\",\"websocket\":\"\"}",
+            "X-Requested-With": "XMLHttpRequest"
         },
         json: {
           username: this.username,
@@ -328,13 +332,24 @@ export class Tick {
     });
   }
 
-  async getTask(taskID: string, projectID: string): Promise<ITask[]> {
+  async getTask(taskID: string, projectID: string|undefined|null): Promise<ITask[]> {
     return new Promise((resolve) => {
-      const url = `${this.apiUrl}/${TaskEndPoint}/${taskID}?projectID=${projectID}`;
+      let url = `${this.apiUrl}/${TaskEndPoint}/${taskID}`//
+      const projectParam = `?projectID=${projectID}`;
+      if (projectID) {
+        url = url + projectParam;
+      }
+
+      console.log(url)
 
       this.request(url, (error: any, response: any, body: any) => {
-        body = JSON.parse(body);
-        resolve(body);
+        try {
+          body = JSON.parse(body);
+          resolve(body);
+        } catch (error) {
+          let msg = "Unexpected response: " + error + "\n" + body
+          throw new Error(msg);
+        }
       });
     });
   }
