@@ -70,7 +70,6 @@ export class Tick {
 
       return new Promise((resolve) => {
         reqObj(options, async (error: any, request: any, body: any) => {
-          let gotInboxProperties = false;
           if (!body || body.errorMessage) {
             console.error(`login error: ${body ? body.errorMessage : 'Probably timeout.'}`);
             resolve(false);
