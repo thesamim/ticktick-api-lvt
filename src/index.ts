@@ -20,6 +20,7 @@ interface IoptionsProps {
   username: string;
   password: string;
   baseUrl?: string;
+  token: string;
 }
 
 export class Tick {
@@ -30,12 +31,14 @@ export class Tick {
     id: string;
     sortOrder: number;
   };
+  token: string;
   apiUrl: string;
 
-  constructor({ username, password, baseUrl }: IoptionsProps) {
+  constructor({ username, password, baseUrl, token }: IoptionsProps) {
     this.request = request.defaults({ jar: true });
     this.username = username;
     this.password = password;
+    this.token = token;
     this.inboxProperties = {
       id: '',
       sortOrder: 0
@@ -47,7 +50,6 @@ export class Tick {
 
   async login(): Promise<boolean> {
     try {
-      console.log(this.apiUrl, this.username, this.password)
       const url = `${this.apiUrl}/${singnInEndPoint}`;
       const options = {
         method: 'POST',
@@ -55,11 +57,10 @@ export class Tick {
         headers: {
           'Content-Type': 'application/json',
           Origin: 'https://ticktick.com',
-          // 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
-          // 'x-device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64f9effe6edff918986b5f71","channel":"website","campaign":"","websocket":"123"}'
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0",
-            "X-Device"  : "{\"platform\":\"web\",\"os\":\"Windows 10\",\"device\":\"Firefox 121.0\",\"name\":\"\",\"version\":5050,\"id\":\"65957b7390584350542c3c92\",\"channel\":\"website\",\"campaign\":\"\",\"websocket\":\"\"}",
-            "X-Requested-With": "XMLHttpRequest"
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+          'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 121.0","name":"","version":5050,"id":"65957b7390584350542c3c92","channel":"website","campaign":"","websocket":"123"}',
+          'X-Requested-With': 'XMLHttpRequest',
+          'Cookie': this.token
         },
         json: {
           username: this.username,
