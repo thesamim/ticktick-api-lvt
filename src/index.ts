@@ -8,13 +8,12 @@ import { IProject } from './types/Project';
 import { ISections } from './types/Project';
 import { ITag } from './types/Tag';
 import { ITask } from './types/Task';
-import { IUpdate } from './types/Task';
 import { IFilter } from './types/Filter';
 import { IHabit } from './types/Habit';
 
 import { API_ENDPOINTS } from './utils/get-api-endpoints';
 
-const { ticktickApiBaseUrl, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, singnInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems } = API_ENDPOINTS;
+const { ticktickServer, protocol, apiProtocol,apiVersion, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, signInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems } = API_ENDPOINTS;
 
 interface IoptionsProps {
   username: string;
@@ -33,6 +32,7 @@ export class Tick {
   };
   token: string;
   apiUrl: string;
+  loginUrl: string;
 
   constructor({ username, password, baseUrl, token }: IoptionsProps) {
     this.request = request.defaults({ jar: true });
@@ -43,14 +43,23 @@ export class Tick {
       id: '',
       sortOrder: 0
     };
-    this.apiUrl = baseUrl || ticktickApiBaseUrl;
+    if (baseUrl) {
+      this.apiUrl = `${apiProtocol}${baseUrl}${apiVersion}`;
+      this.loginUrl = `${protocol}${baseUrl}${apiVersion}`;
+    } else {
+      this.apiUrl = `${apiProtocol}${ticktickServer}${apiVersion}`;
+      this.loginUrl = `${protocol}${ticktickServer}${apiVersion}`;
+    }
+
+    console.log("constructing: ", this.apiUrl, this.loginUrl, this.token);
   }
 
   // USER ======================================================================
 
   async login(): Promise<boolean> {
     try {
-      const url = `${this.apiUrl}/${singnInEndPoint}`;
+      const url = `${this.loginUrl}/${signInEndPoint}`;
+      console.log("Logging in with: ", url);
       const options = {
         method: 'POST',
         url: url,
@@ -60,7 +69,7 @@ export class Tick {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
           'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 121.0","name":"","version":5050,"id":"65957b7390584350542c3c92","channel":"website","campaign":"","websocket":"123"}',
           'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': this.token
+          'Cookie': `t=${this.token}`
         },
         json: {
           username: this.username,
@@ -70,16 +79,17 @@ export class Tick {
       const reqObj = this.request;
 
       return new Promise((resolve) => {
-        reqObj(options, async (error: any, request: any, body: any) => {
-          if (!body || body.errorMessage) {
-            console.error(`login error: ${body ? body.errorMessage : 'Probably timeout.'}`);
+        reqObj(options, async (error: any, response: any, request: any, body: any) => {
+          console.log("error", error, "body",body, "response", response);
+          if ((!response) || (response.statusCode != 200)) {
+            console.error(`login error: ${response ? `${JSON.stringify(response.body)}`: 'Probably timeout.'}`);
             resolve(false);
           } else {
             await this.getInboxProperties()
-              .then((data) => {
+              .then(() => {
                 resolve(true);
               })
-              .catch((err) => {
+              .catch(() => {
                 resolve(false);
               });
           }

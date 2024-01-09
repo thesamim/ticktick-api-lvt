@@ -1,8 +1,11 @@
 export { API_ENDPOINTS };
 
 const API_ENDPOINTS = {
-  ticktickApiBaseUrl: 'https://api.ticktick.com/api/v2',
-  singnInEndPoint: 'user/signon?wc=true&remember=true',
+  ticktickServer: 'ticktick.com',
+  protocol: "https://",
+  apiProtocol: "https://api.",
+  apiVersion: '/api/v2',
+  signInEndPoint: 'user/signon?wc=true&remember=true',
   userPreferencesEndPoint: 'user/preferences/settings',
   generalDetailsEndPoint: 'batch/check/0',
   allProjectsEndPoint: 'projects',
