@@ -13,19 +13,42 @@ import { IHabit } from './types/Habit';
 
 import { API_ENDPOINTS } from './utils/get-api-endpoints';
 
+
+
 const { ticktickServer, protocol, apiProtocol,apiVersion, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, signInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems } = API_ENDPOINTS;
 
 interface IoptionsProps {
-  username: string;
-  password: string;
-  baseUrl?: string;
   token: string;
+  username?: string;
+  password?: string;
+  baseUrl?: string;
+
+}
+
+interface IreqOptions {
+  method: string,
+  url: string,
+  headers: {
+    'Content-Type': 'application/json',
+    Origin: string,
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 121.0","name":"","version":5050,"id":"65957b7390584350542c3c92","channel":"website","campaign":"","websocket":"123"}',
+    'X-Requested-With': 'XMLHttpRequest',
+    'Cookie': string
+  }
 }
 
 export class Tick {
+  private originUrl: string;
+  get lastError(): any {
+    return this._lastError;
+  }
+  get inboxId(): string {
+    return this.inboxProperties.id
+  }
   request: any;
-  username: string;
-  password: string;
+  username: string|undefined;
+  password: string|undefined;
   inboxProperties: {
     id: string;
     sortOrder: number;
@@ -33,6 +56,7 @@ export class Tick {
   token: string;
   apiUrl: string;
   loginUrl: string;
+  private _lastError: any;
 
   constructor({ username, password, baseUrl, token }: IoptionsProps) {
     this.request = request.defaults({ jar: true });
@@ -46,12 +70,14 @@ export class Tick {
     if (baseUrl) {
       this.apiUrl = `${apiProtocol}${baseUrl}${apiVersion}`;
       this.loginUrl = `${protocol}${baseUrl}${apiVersion}`;
+      this.originUrl = `${protocol}${baseUrl}`
     } else {
       this.apiUrl = `${apiProtocol}${ticktickServer}${apiVersion}`;
       this.loginUrl = `${protocol}${ticktickServer}${apiVersion}`;
+      this.originUrl = `${protocol}${ticktickServer}`
     }
 
-    console.log("constructing: ", this.apiUrl, this.loginUrl, this.token);
+
   }
 
   // USER ======================================================================
@@ -59,32 +85,27 @@ export class Tick {
   async login(): Promise<boolean> {
     try {
       const url = `${this.loginUrl}/${signInEndPoint}`;
-      console.log("Logging in with: ", url);
-      const options = {
-        method: 'POST',
-        url: url,
-        headers: {
-          'Content-Type': 'application/json',
-          Origin: 'https://ticktick.com',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
-          'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 121.0","name":"","version":5050,"id":"65957b7390584350542c3c92","channel":"website","campaign":"","websocket":"123"}',
-          'X-Requested-With': 'XMLHttpRequest',
-          'Cookie': `t=${this.token}`
-        },
+
+      const baseOptions = this.createIreqOptions("POST", url);
+      const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
         json: {
           username: this.username,
           password: this.password
         }
       };
       const reqObj = this.request;
-
+      reqObj.body = JSON.stringify({
+        username: this.username,
+        password: this.password
+      });
       return new Promise((resolve) => {
         reqObj(options, async (error: any, response: any, request: any, body: any) => {
-          console.log("error", error, "body",body, "response", response);
-          if ((!response) || (response.statusCode != 200)) {
-            console.error(`login error: ${response ? `${JSON.stringify(response.body)}`: 'Probably timeout.'}`);
+        if ((!response) || (response.statusCode != 200)) {
+            this._lastError = `login error: ${response ? `${JSON.stringify(response.body)}`: 'Probably timeout.'}`;
             resolve(false);
           } else {
+            this.token = response.body.token;
+
             await this.getInboxProperties()
               .then(() => {
                 resolve(true);
@@ -100,29 +121,56 @@ export class Tick {
     }
   }
 
-  async getUserSettings(): Promise<any[]> {
+  async getUserSettings(): Promise<any[]|null> {
+
+    const url = `${this.apiUrl}/${userPreferencesEndPoint}`;
+
+    const options = this.createIreqOptions('GET', url)
+    const reqObj = this.request;
+    console.log("GUS: ", options)
+
+
     return new Promise((resolve) => {
-      const url = `${this.apiUrl}/${userPreferencesEndPoint}`;
-      this.request(url, (error: any, response: any, body: any) => {
-        body = JSON.parse(body);
-        resolve(body);
+      reqObj(options, async (error: any, response: any, body: any) => {
+        if (error || (response.statusCode != 200))
+        {
+          this.setError(response, error);
+          resolve(null)
+        } else if (response.body) {
+          this.setError(response, error);
+          resolve(body);
+        } else {
+          //assuming we fail only if token expired.
+          this.setError(response, error);
+          throw new Error("Call Failed. Token Expired. Probably.")
+        }
       });
     });
   }
 
-  private async getInboxProperties(): Promise<boolean> {
+
+
+  async getInboxProperties(): Promise<boolean> {
     return new Promise((resolve) => {
       try {
-        const url = `${this.apiUrl}/${generalDetailsEndPoint}`;
+        let url;
+        //Dida does not return inbox in the general details. It does in the all task.
+        if (this.originUrl.includes("ticktick")) {
+          url = `${this.apiUrl}/${generalDetailsEndPoint}`;
+        } else {
+          url = `${this.apiUrl}/${allTasksEndPoint}`;
+        }
+        const options = this.createIreqOptions('GET', url)
+        console.log("getting from: ", options.url)
+        this.request(options, (error: any, response: any, body: any) => {
 
-        this.request(url, (error: any, response: any, body: any) => {
           if (error) {
             console.error(error);
             resolve(false);
           }
           if (body) {
             body = JSON.parse(body);
-
+            console.log("inbox: ", error,  body)
             this.inboxProperties.id = body.inboxId;
             body.syncTaskBean.update.forEach((task: any) => {
               if (task.projectId == this.inboxProperties.id && task.sortOrder < this.inboxProperties.sortOrder) {
@@ -145,8 +193,8 @@ export class Tick {
   async getFilters(): Promise<IFilter[]> {
     return new Promise((resolve) => {
       const url = `${this.apiUrl}/${generalDetailsEndPoint}`;
-
-      this.request(url, (error: any, response: any, body: any) => {
+      const options = this.createIreqOptions('GET', url)
+      this.request(options, (error: any, response: any, body: any) => {
         body = JSON.parse(body);
         resolve(body.filters);
       });
@@ -158,7 +206,8 @@ export class Tick {
   async getTags(): Promise<ITag[]> {
     return new Promise((resolve) => {
       const url = `${this.apiUrl}/${allTagsEndPoint}`;
-      this.request(url, (error: any, response: any, body: any) => {
+      const options = this.createIreqOptions('GET', url)
+      this.request(options, (error: any, response: any, body: any) => {
         body = JSON.parse(body);
         resolve(body);
       });
@@ -171,7 +220,8 @@ export class Tick {
     return new Promise((resolve) => {
       try {
         const url = `${this.apiUrl}/${allHabitsEndPoint}`;
-        this.request(url, (error: any, response: any, body: any) => {
+        const options = this.createIreqOptions('GET', url)
+        this.request(options, (error: any, response: any, body: any) => {
           const parsedBody = JSON.parse(body);
           resolve(parsedBody);
         });
@@ -186,8 +236,8 @@ export class Tick {
   async getProjectGroups(): Promise<IProjectGroup[]> {
     return new Promise((resolve) => {
       const url = `${this.apiUrl}/${generalDetailsEndPoint}`;
-
-      this.request(url, (error: any, response: any, body: any) => {
+      const options = this.createIreqOptions('GET', url)
+      this.request(options, (error: any, response: any, body: any) => {
         if (error) {
           console.error('Error on getProjectGroups', error);
           resolve([]);
@@ -203,7 +253,8 @@ export class Tick {
     return new Promise((resolve) => {
       try {
         const url = `${this.apiUrl}/${allProjectsEndPoint}`;
-        this.request(url, (error: any, response: any, body: any) => {
+        const options = this.createIreqOptions('GET', url)
+        this.request(options, (error: any, response: any, body: any) => {
           if (error) {
             console.error('Error on getProjects', error);
             resolve([]);
@@ -213,7 +264,7 @@ export class Tick {
           }
         });
       } catch (e) {
-        console.error('did we get a weird body: ', e);
+        console.error('Error getting Projects: ', e);
         resolve([]);
       }
     });
@@ -241,7 +292,8 @@ export class Tick {
     return new Promise((resolve) => {
       try {
         const url = `${this.apiUrl}/${getSections}/${projectId}`;
-        this.request(url, (error: any, response: any, body: any) => {
+        const options = this.createIreqOptions('GET', url)
+        this.request(options, (error: any, response: any, body: any) => {
           if (error) {
             console.error('Error on getProjectSections', error);
             resolve([]);
@@ -251,7 +303,7 @@ export class Tick {
           }
         });
       } catch (e) {
-        console.error(e);
+        console.error("Error on getting Sections", e);
         resolve([]);
       }
     });
@@ -260,24 +312,17 @@ export class Tick {
   // RESOURCES =================================================================
   async getAllResources(): Promise<ITask[]> {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
-    const options = {
-      method: 'GET',
-      url: url,
-      headers: {
-        Origin: 'https://ticktick.com'
-      }
-    };
-
+    const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
       this.request(options, function (error: any, response: any, body: any) {
         if (error) {
-          console.error('Get all resources failed: ', error);
+          console.error('Error getting resources: ', error);
           resolve([]);
         } else {
           if (body) {
             body = JSON.parse(body);
           } else {
-            console.error('Did not get a response on get all resources.');
+            console.error('Did not get a response getting resources.');
             resolve([]);
           }
         }
@@ -291,14 +336,7 @@ export class Tick {
 
   async getTasksStatus(): Promise<ITask[]> {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
-    const options = {
-      method: 'GET',
-      url: url,
-      headers: {
-        Origin: 'https://ticktick.com'
-      }
-    };
-
+    const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
       this.request(options, function (error: any, response: any, body: any) {
         if (body) {
@@ -314,14 +352,7 @@ export class Tick {
 
   async getAllTasks(): Promise<ITask[]> {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
-    const options = {
-      method: 'GET',
-      url: url,
-      headers: {
-        Origin: 'https://ticktick.com'
-      }
-    };
-
+    const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
       this.request(options, function (error: any, response: any, body: any) {
         body = JSON.parse(body);
@@ -334,8 +365,9 @@ export class Tick {
   async getTasks(): Promise<ITask[]> {
     return new Promise((resolve) => {
       const url = `${this.apiUrl}/${generalDetailsEndPoint}`;
+      const options = this.createIreqOptions('GET', url)
 
-      this.request(url, (error: any, response: any, body: any) => {
+      this.request(options, (error: any, response: any, body: any) => {
         body = JSON.parse(body);
         resolve(body.syncTaskBean.update);
       });
@@ -345,14 +377,13 @@ export class Tick {
   async getTask(taskID: string, projectID: string|undefined|null): Promise<ITask[]> {
     return new Promise((resolve) => {
       let url = `${this.apiUrl}/${TaskEndPoint}/${taskID}`//
+
       const projectParam = `?projectID=${projectID}`;
       if (projectID) {
         url = url + projectParam;
       }
-
-      console.log(url)
-
-      this.request(url, (error: any, response: any, body: any) => {
+      const options = this.createIreqOptions('GET', url)
+      this.request(options, (error: any, response: any, body: any) => {
         try {
           body = JSON.parse(body);
           resolve(body);
@@ -367,8 +398,8 @@ export class Tick {
   async getAllCompletedItems(): Promise<ITask[]> {
     return new Promise((resolve) => {
       const url = `${this.apiUrl}/${getAllCompletedItems}`;
-
-      this.request(url, (error: any, response: any, body: any) => {
+      const options = this.createIreqOptions('GET', url)
+      this.request(options, (error: any, response: any, body: any) => {
         body = JSON.parse(body);
         resolve(body);
       });
@@ -407,25 +438,14 @@ export class Tick {
     let taskBody: any;
     taskBody = thisTask;
 
-    const options = {
-      method: 'POST',
-      url: `${this.apiUrl}/${TaskEndPoint}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: 'https://ticktick.com',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
-        'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64fc9b22cbb2c305b2df7ad6","channel":"website","campaign":"","websocket":"6500a8a3bf02224e648ef8bd"}'
-      },
+    const url = `${this.apiUrl}/${TaskEndPoint}`;
+    const baseOptions= this.createIreqOptions('POST', url)
+    const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
       json: taskBody
     };
 
     return new Promise((resolve) => {
       this.request(options, (error: any, response: any, body: any) => {
-        // console.log("add === ")
-        // console.log("\n\nerror: ", error),
-        // console.log("\n\nresponse: ", response)
-        // console.log("\n\nbody: :",body)
-        // console.log("=== add end ")
         if (error) {
           console.error('Error on addTask', error);
           resolve([]);
@@ -440,6 +460,7 @@ export class Tick {
   }
 
   updateTask(jsonOptions: any): Promise<any> {
+    console.log(jsonOptions.title, jsonOptions.id, jsonOptions.projectId);
     const thisTask: ITask = {
       id: jsonOptions.id ? jsonOptions.id : ObjectID(),
       projectId: jsonOptions.projectId ? jsonOptions.projectId : this.inboxProperties.id,
@@ -477,30 +498,19 @@ export class Tick {
       updateAttachments: [],
       update: [thisTask]
     };
-
-    const options = {
-      method: 'POST',
-      url: `${this.apiUrl}/${updateTaskEndPoint}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: 'https://ticktick.com',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
-        'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64fc9b22cbb2c305b2df7ad6","channel":"website","campaign":"","websocket":"6500a8a3bf02224e648ef8bd"}'
-      },
+    const url = `${this.apiUrl}/${updateTaskEndPoint}`;
+    const baseOptions= this.createIreqOptions('POST', url)
+    const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
       json: taskBody
     };
-
+    console.log("options: ", options)
     return new Promise((resolve) => {
       this.request(options, (error: any, response: any, body: any) => {
-        // console.log("add === ")
-        // console.log("\n\nerror: ", error),
-        // console.log("\n\nresponse: ", response)
-        // console.log("\n\nbody: :",body)
-        // console.log("=== add end ")
         if (error) {
           console.error('Error on updateTask', error);
           resolve([]);
         } else {
+          console.log("update should have worked.")
           this.inboxProperties.sortOrder = body.sortOrder - 1;
           resolve(body);
         }
@@ -524,17 +534,12 @@ export class Tick {
       update: []
     };
 
-    const options = {
-      method: 'POST',
-      url: `${this.apiUrl}/${updateTaskEndPoint}`,
-      headers: {
-        'Content-Type': 'application/json',
-        Origin: 'https://ticktick.com',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/117.0',
-        'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 117.0","name":"","version":4576,"id":"64fc9b22cbb2c305b2df7ad6","channel":"website","campaign":"","websocket":"6500a8a3bf02224e648ef8bd"}'
-      },
+    const url = `${this.apiUrl}/${updateTaskEndPoint}`;
+    const baseOptions= this.createIreqOptions('POST', url)
+    const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
       json: taskBody
     };
+
 
     return new Promise((resolve) => {
       this.request(options, (error: any, response: any, body: any) => {
@@ -542,5 +547,27 @@ export class Tick {
         resolve(body);
       });
     });
+  }
+
+  private createIreqOptions(method:string, url:string) {
+    const options: IreqOptions = {
+      method: method,
+      url: url,
+      headers: {
+        'Content-Type': 'application/json',
+        Origin : this.originUrl,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+        'X-Device': '{"platform":"web","os":"Windows 10","device":"Firefox 121.0","name":"","version":5050,"id":"65957b7390584350542c3c92","channel":"website","campaign":"","websocket":"123"}',
+        'X-Requested-With': 'XMLHttpRequest',
+        'Cookie': "t=" + this.token
+      }
+    };
+    return options;
+  }
+
+  private setError(response: any, error: any) {
+    const statusCode = response.statusCode
+    const body = response.body;
+    this._lastError = {statusCode, error, body }
   }
 }
