@@ -1,4 +1,4 @@
-import { Tick } from '../src/index'
+import { Tick } from '../src'
 import dotenv from 'dotenv'
 import { ITask } from '../src/types/Task'
 dotenv.config()
@@ -183,7 +183,7 @@ function printTaskAndChildren(task: ITask, depth: number) {
   childCount = childCount + depth;
   for (let index = 0; index < childCount; index++) {
     tabs += '\t';
-  };
+  }
   // console.log(`[${tabs}], ${tabs.length}, ${childCount}`);
   if (donePrinted.indexOf(task.id) < 1) {
     console.log(`${tabs}title: ${task.title} -- ${task.id} -- parent ${task.parentId} --- project: ${task.projectId}`)
