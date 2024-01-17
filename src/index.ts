@@ -127,8 +127,6 @@ export class Tick {
 
     const options = this.createIreqOptions('GET', url)
     const reqObj = this.request;
-    console.log("GUS: ", options)
-
 
     return new Promise((resolve) => {
       reqObj(options, async (error: any, response: any, body: any) => {
@@ -161,7 +159,7 @@ export class Tick {
           url = `${this.apiUrl}/${allTasksEndPoint}`;
         }
         const options = this.createIreqOptions('GET', url)
-        console.log("getting from: ", options.url)
+
         this.request(options, (error: any, response: any, body: any) => {
 
           if (error) {
@@ -170,7 +168,6 @@ export class Tick {
           }
           if (body) {
             body = JSON.parse(body);
-            console.log("inbox: ", error,  body)
             this.inboxProperties.id = body.inboxId;
             body.syncTaskBean.update.forEach((task: any) => {
               if (task.projectId == this.inboxProperties.id && task.sortOrder < this.inboxProperties.sortOrder) {
@@ -460,7 +457,6 @@ export class Tick {
   }
 
   updateTask(jsonOptions: any): Promise<any> {
-    console.log(jsonOptions.title, jsonOptions.id, jsonOptions.projectId);
     const thisTask: ITask = {
       id: jsonOptions.id ? jsonOptions.id : ObjectID(),
       projectId: jsonOptions.projectId ? jsonOptions.projectId : this.inboxProperties.id,
@@ -503,14 +499,12 @@ export class Tick {
     const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
       json: taskBody
     };
-    console.log("options: ", options)
     return new Promise((resolve) => {
       this.request(options, (error: any, response: any, body: any) => {
         if (error) {
           console.error('Error on updateTask', error);
           resolve([]);
         } else {
-          console.log("update should have worked.")
           this.inboxProperties.sortOrder = body.sortOrder - 1;
           resolve(body);
         }
