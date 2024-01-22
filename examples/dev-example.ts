@@ -3,6 +3,7 @@ import dotenv from 'dotenv'
 import { ITask } from '../src/types/Task'
 dotenv.config()
 import { isValid } from '../src/utils/validate'
+import fs from "fs";
 
 let allAllTasks: ITask[] = null;
 let donePrinted: string[] = [];
@@ -11,7 +12,7 @@ export async function testTick() {
   try {
     const envUSERNAME = process.env.TICK_USERNAME
     const envPASSWORD = process.env.TICK_PASSWORD
-    const baseURL = "dida365.com" // or "ticktick.com"
+    const baseURL =   "dida365.com" //"ticktick.com"
 
     const projectID = "" // an arbitrary project id to test with.;
     const token = ""; //token grabbed from login cookie.
@@ -25,7 +26,7 @@ export async function testTick() {
       throw new Error("Login failed.")
     }
     let response = await tickSession.getUserSettings();
-    console.log("Response:", JSON.parse(response))
+    // console.log("Response:", JSON.parse(response))
 
     if (!response) {
       console.error("Not Logged in.", tickSession.lastError)
@@ -33,8 +34,16 @@ export async function testTick() {
     }
 
     response = await tickSession.getInboxProperties();
-    console.log(response, tickSession.inboxId)
-
+    // console.log(response, tickSession.inboxId)
+    console.log("this much")
+    let bkup = await  tickSession.exportData();
+    if (tickSession.lastError.statusCode != "200") {
+      console.log("What? ", tickSession.lastError)
+    } else {
+      console.log("Got a : ", bkup, bkup[0].substring(1, 50))
+      fs.writeFileSync("e:\\temp\\ttbckup.csv", bkup)
+    }
+return
 
 
     // let myTask: ITask = {

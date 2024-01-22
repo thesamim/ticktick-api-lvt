@@ -17,7 +17,9 @@ const API_ENDPOINTS = {
   //If this ever existed, it's gone now. use getSections. That's the only project detail anyway.
   //getProject: 'project/',
   getSections: 'column/project/',
-  getAllCompletedItems: "project/all/completedInAll/"
+  getAllCompletedItems: "project/all/completedInAll/",
+  exportData: 'data/export'
+
 };
 
 /*

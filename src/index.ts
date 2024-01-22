@@ -12,10 +12,11 @@ import { IFilter } from './types/Filter';
 import { IHabit } from './types/Habit';
 
 import { API_ENDPOINTS } from './utils/get-api-endpoints';
+import fs from "fs";
 
 
 
-const { ticktickServer, protocol, apiProtocol,apiVersion, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, signInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems } = API_ENDPOINTS;
+const { ticktickServer, protocol, apiProtocol,apiVersion, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, signInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems, exportData } = API_ENDPOINTS;
 
 interface IoptionsProps {
   token: string;
@@ -539,6 +540,41 @@ export class Tick {
       this.request(options, (error: any, response: any, body: any) => {
         this.inboxProperties.sortOrder = body.sortOrder - 1;
         resolve(body);
+      });
+    });
+  }
+
+
+  async exportData(): Promise<string|null> {
+
+    const url = `${this.apiUrl}/${exportData}`;
+
+    const options = this.createIreqOptions('GET', url)
+    const reqObj = this.request;
+
+    return new Promise((resolve) => {
+      reqObj(options, async (error: any, response: any, body: any) => {
+        if (error || (response.statusCode != 200))
+        {
+          this.setError(response, error);
+          resolve(null)
+        } else if (response.body) {
+          //What we get back is a string, with escaped characters.
+
+          //get rid of first and last quote.
+          body = body.substring(1);
+          body = body.substring(0, body.length - 1)
+
+          //get rid of escaped quotes, and escaped line returns
+          body = body.replace(/\\\"/g, '"')
+          body = body.replace(/\\n/g, '\n')
+
+          resolve(body);
+        } else {
+          //assuming we fail only if token expired.
+          this.setError(response, error);
+          throw new Error("Export Data Failed..")
+        }
       });
     });
   }
