@@ -12,11 +12,28 @@ import { IFilter } from './types/Filter';
 import { IHabit } from './types/Habit';
 
 import { API_ENDPOINTS } from './utils/get-api-endpoints';
-import fs from "fs";
 
 
-
-const { ticktickServer, protocol, apiProtocol,apiVersion, TaskEndPoint, updateTaskEndPoint, allTagsEndPoint, generalDetailsEndPoint, allHabitsEndPoint, allProjectsEndPoint, allTasksEndPoint, signInEndPoint, userPreferencesEndPoint, getSections, getAllCompletedItems, exportData } = API_ENDPOINTS;
+const {
+  ticktickServer,
+  protocol,
+  apiProtocol,
+  apiVersion,
+  TaskEndPoint,
+  updateTaskEndPoint,
+  allTagsEndPoint,
+  generalDetailsEndPoint,
+  allHabitsEndPoint,
+  allProjectsEndPoint,
+  allTasksEndPoint,
+  signInEndPoint,
+  userPreferencesEndPoint,
+  getSections,
+  getAllCompletedItems,
+  exportData,
+  projectMove,
+  parentMove
+} = API_ENDPOINTS;
 
 interface IoptionsProps {
   token: string;
@@ -99,10 +116,11 @@ export class Tick {
         username: this.username,
         password: this.password
       });
+      console.log("this object", url)
       return new Promise((resolve) => {
         reqObj(options, async (error: any, response: any, request: any, body: any) => {
-        if ((!response) || (response.statusCode != 200)) {
-            this._lastError = `login error: ${response ? `${JSON.stringify(response.body)}`: 'Probably timeout.'}`;
+          if ((!response) || (response.statusCode != 200)) {
+            this.setError("login Error", response, error)
             resolve(false);
           } else {
             this.token = response.body.token;
@@ -133,14 +151,14 @@ export class Tick {
       reqObj(options, async (error: any, response: any, body: any) => {
         if (error || (response.statusCode != 200))
         {
-          this.setError(response, error);
+          this.setError("Get User Settings", response, error);
           resolve(null)
         } else if (response.body) {
-          this.setError(response, error);
+          this.setError("Get User Settings", response, error);
           resolve(body);
         } else {
           //assuming we fail only if token expired.
-          this.setError(response, error);
+          this.setError("Get User Settings", response, error);
           throw new Error("Call Failed. Token Expired. Probably.")
         }
       });
@@ -164,7 +182,7 @@ export class Tick {
         this.request(options, (error: any, response: any, body: any) => {
 
           if (error) {
-            console.error(error);
+            this.setError("Get Inbox Properties", response, error)
             resolve(false);
           }
           if (body) {
@@ -180,6 +198,7 @@ export class Tick {
           resolve(true);
         });
       } catch (e) {
+        this.setError("Get Inbox Properties", null, e)
         console.error('Get Inbox Properties failed: ', e);
         resolve(false);
       }
@@ -236,8 +255,13 @@ export class Tick {
       const url = `${this.apiUrl}/${generalDetailsEndPoint}`;
       const options = this.createIreqOptions('GET', url)
       this.request(options, (error: any, response: any, body: any) => {
+        if (response.statusCode != 200) {
+          this.setError("Get Project Groups", response, error)
+          resolve([]);
+          return
+        }
         if (error) {
-          console.error('Error on getProjectGroups', error);
+          this.setError("Get Project Groups", response, error)
           resolve([]);
         } else {
           body = JSON.parse(body);
@@ -312,8 +336,9 @@ export class Tick {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
     const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
-      this.request(options, function (error: any, response: any, body: any) {
+      this.request(options, (error: any, response: any, body: any) => {
         if (error) {
+          this.setError("Get All Resources", response, error)
           console.error('Error getting resources: ', error);
           resolve([]);
         } else {
@@ -336,12 +361,13 @@ export class Tick {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
     const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
-      this.request(options, function (error: any, response: any, body: any) {
+      this.request(options, (error: any, response: any, body: any) => {
         if (body) {
           body = JSON.parse(body);
           const tasks: ITask[] = body['syncTaskBean'];
           resolve(tasks);
         } else {
+          this.setError("Get TaskStatus", response, error)
           console.error('Get Task Status: No body received in response.');
         }
       });
@@ -352,7 +378,7 @@ export class Tick {
     const url = `${this.apiUrl}/${allTasksEndPoint}`;
     const options = this.createIreqOptions('GET', url)
     return new Promise((resolve) => {
-      this.request(options, function (error: any, response: any, body: any) {
+      this.request(options, (error: any, response: any, body: any) => {
         body = JSON.parse(body);
         const tasks: ITask[] = body['syncTaskBean']['update'];
         resolve(tasks);
@@ -556,7 +582,7 @@ export class Tick {
       reqObj(options, async (error: any, response: any, body: any) => {
         if (error || (response.statusCode != 200))
         {
-          this.setError(response, error);
+          this.setError("Export Data", response, error);
           resolve(null)
         } else if (response.body) {
           //What we get back is a string, with escaped characters.
@@ -572,13 +598,67 @@ export class Tick {
           resolve(body);
         } else {
           //assuming we fail only if token expired.
-          this.setError(response, error);
+          this.setError("Export Data", response, error);
           throw new Error("Export Data Failed..")
         }
       });
     });
   }
 
+
+  projectMove(taskId: string, fromProjectId: string, toProjectId: string): Promise<string|null> {
+    const url = `${this.apiUrl}/${projectMove}`;
+    const baseOptions= this.createIreqOptions('POST', url)
+      const parms = [{
+        fromProjectId: fromProjectId,
+        toProjectId: toProjectId,
+        taskId: taskId,
+        sortOrder: -1924145348608
+      }];
+
+
+    const options = { method: baseOptions.method, url: baseOptions.url, headers:baseOptions.headers,
+      json: parms
+    };
+    return new Promise((resolve) => {
+      this.request(options, (error: any, response: any, body: any) => {
+        if (error) {
+          console.error('Error on Project Move', error);
+          resolve(null);
+        } else {
+          this.inboxProperties.sortOrder = body.sortOrder - 1;
+          resolve(body);
+        }
+      });
+    });
+  }
+
+parentMove(taskId: string, newParentId: string, projectId: string): Promise<string|null> {
+  const url = `${this.apiUrl}/${parentMove}`;
+  const baseOptions = this.createIreqOptions('POST', url)
+  const parms = [{
+    parentId: newParentId,
+    projectId: projectId,
+    taskId: taskId,
+  }];
+
+
+  const options = {
+    method: baseOptions.method, url: baseOptions.url, headers: baseOptions.headers,
+    json: parms
+  };
+  return new Promise((resolve) => {
+    this.request(options, (error: any, response: any, body: any) => {
+      if (error) {
+        console.error('Error on Parent Move', error);
+        resolve(null);
+      } else {
+        this.inboxProperties.sortOrder = body.sortOrder - 1;
+        resolve(body);
+      }
+    });
+  });
+}
   private createIreqOptions(method:string, url:string) {
     const options: IreqOptions = {
       method: method,
@@ -595,9 +675,9 @@ export class Tick {
     return options;
   }
 
-  private setError(response: any, error: any) {
+  private setError(operation: string, response: any, error: any) {
     const statusCode = response.statusCode
     const body = response.body;
-    this._lastError = {statusCode, error, body }
+    this._lastError = {statusCode, operation, error, body }
   }
 }

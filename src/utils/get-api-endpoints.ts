@@ -18,8 +18,9 @@ const API_ENDPOINTS = {
   //getProject: 'project/',
   getSections: 'column/project/',
   getAllCompletedItems: "project/all/completedInAll/",
-  exportData: 'data/export'
-
+  exportData: 'data/export',
+  projectMove: 'batch/taskProject',
+  parentMove: `batch/taskParent`
 };
 
 /*
