@@ -116,7 +116,6 @@ export class Tick {
         username: this.username,
         password: this.password
       });
-      console.log("this object", url)
       return new Promise((resolve) => {
         reqObj(options, async (error: any, response: any, request: any, body: any) => {
           if ((!response) || (response.statusCode != 200)) {
@@ -431,6 +430,12 @@ export class Tick {
   }
 
   addTask(jsonOptions: any): Promise<any> {
+    let bIsAllDay = true;
+    if (jsonOptions.isAllDay == null) {
+      bIsAllDay = true;
+    } else {
+      bIsAllDay = jsonOptions.isAllDay
+    }
     const thisTask: ITask = {
       id: jsonOptions.id ? jsonOptions.id : ObjectID(),
       projectId: jsonOptions.projectId ? jsonOptions.projectId : this.inboxProperties.id,
@@ -440,7 +445,7 @@ export class Tick {
       startDate: jsonOptions.startDate ? jsonOptions.startDate : null,
       dueDate: jsonOptions.dueDate ? jsonOptions.dueDate : null,
       timeZone: jsonOptions.timeZone ? jsonOptions.timeZone : 'America/New_York', // This needs to be updated to grab dynamically
-      isAllDay: jsonOptions.isAllDay ? jsonOptions.isAllDay : null,
+      isAllDay: bIsAllDay,
       reminder: jsonOptions.reminder ? jsonOptions.reminder : null,
       reminders: jsonOptions.reminders ? jsonOptions.reminders : [{ id: ObjectID(), trigger: 'TRIGGER:PT0S' }],
       repeatFlag: jsonOptions.repeatFlag ? jsonOptions.repeatFlag : null,
@@ -484,6 +489,12 @@ export class Tick {
   }
 
   updateTask(jsonOptions: any): Promise<any> {
+    let bIsAllDay = true;
+    if (jsonOptions.isAllDay == null) {
+      bIsAllDay = true;
+    } else {
+      bIsAllDay = jsonOptions.isAllDay
+    }
     const thisTask: ITask = {
       id: jsonOptions.id ? jsonOptions.id : ObjectID(),
       projectId: jsonOptions.projectId ? jsonOptions.projectId : this.inboxProperties.id,
@@ -493,7 +504,7 @@ export class Tick {
       startDate: jsonOptions.startDate ? jsonOptions.startDate : null,
       dueDate: jsonOptions.dueDate ? jsonOptions.dueDate : null,
       timeZone: jsonOptions.timeZone ? jsonOptions.timeZone : 'America/New_York', // This needs to be updated to grab dynamically
-      isAllDay: jsonOptions.isAllDay ? jsonOptions.isAllDay : null,
+      isAllDay: bIsAllDay,
       reminder: jsonOptions.reminder ? jsonOptions.reminder : null,
       reminders: jsonOptions.reminders ? jsonOptions.reminders : [{ id: ObjectID(), trigger: 'TRIGGER:PT0S' }],
       repeatFlag: jsonOptions.repeatFlag ? jsonOptions.repeatFlag : null,
